@@ -1,3 +1,4 @@
+use crate::client::github::GitHubUserType;
 use crate::client::github::GithubClient;
 use crate::config::CommandLineArgs;
 use futures::future;
@@ -21,7 +22,9 @@ pub async fn run(cli_args: CommandLineArgs) -> Result<(), Box<dyn Error>> {
     if let Some(user) = cli_args.user {
         let mut handles = Vec::new();
         println!("Cloning from user {}", user);
-        let repos = gh_client.get_all_user_repos(&user).await?;
+        let repos = gh_client
+            .list_all_repos(GitHubUserType::User, &user)
+            .await?;
         for repo in repos {
             handles.push(task::spawn(
                 async move { GithubClient::clone_repo(&repo).await },
@@ -31,7 +34,9 @@ pub async fn run(cli_args: CommandLineArgs) -> Result<(), Box<dyn Error>> {
     } else if let Some(org) = cli_args.organisation {
         let mut handles = Vec::new();
         println!("Cloning from org {}", org);
-        let repos = gh_client.get_all_org_repos(&org).await?;
+        let repos = gh_client
+            .list_all_repos(GitHubUserType::Organisation, &org)
+            .await?;
 
         for repo in repos {
             handles.push(task::spawn(

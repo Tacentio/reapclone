@@ -14,6 +14,12 @@ pub struct GithubClient {
     http_client: reqwest::Client,
 }
 
+#[derive(Clone)]
+pub enum GitHubUserType {
+    User,
+    Organisation,
+}
+
 impl GithubClient {
     pub fn new(auth_token: Option<&str>, user_agent: &str) -> Result<GithubClient, Box<dyn Error>> {
         match auth_token {
@@ -39,33 +45,18 @@ impl GithubClient {
         }
     }
 
-    /// Lists a GitHub user's repositories.
-    pub async fn get_user_repos(
+    /// List GitHub repos for a user or organisation.
+    pub async fn list_repos(
         &self,
-        user: &str,
-        page: Option<u32>,
-    ) -> Result<Vec<Repo>, Box<dyn Error>> {
-        let page_number = page.unwrap_or(1);
-        let url_base = format!("https://api.github.com/users/{}/repos", user);
-        let query_string = vec![("page", format!("{}", page_number))];
-        let url = Url::parse_with_params(&url_base, query_string)?;
-        let r_body = self
-            .http_client
-            .get(url)
-            .send()
-            .await?
-            .json::<Vec<Repo>>()
-            .await?;
-        return Ok(r_body);
-    }
-    /// Lists a GitHub organisation's repositories.
-    pub async fn get_org_repos(
-        &self,
+        user_type: GitHubUserType,
         org: &str,
         page: Option<u32>,
     ) -> Result<Vec<Repo>, Box<dyn Error>> {
         let page_number = page.unwrap_or(1);
-        let url_base = format!("https://api.github.com/orgs/{}/repos", org);
+        let url_base = match user_type {
+            GitHubUserType::Organisation => format!("https://api.github.com/orgs/{}/repos", org),
+            GitHubUserType::User => format!("https://api.github.com/users/{}/repos", org),
+        };
         let query_string = vec![("page", format!("{}", page_number))];
         let url = Url::parse_with_params(&url_base, query_string)?;
         let r_body = self
@@ -77,38 +68,26 @@ impl GithubClient {
             .await?;
         return Ok(r_body);
     }
-    
-    /// Fetches all of an organisations repositories by looping over the page numbers
-    /// until an empty Array is returned. This is done synchronously to avoid hitting
-    /// GitHub rate limit. Perhaps in the future this can be done async while still 
-    /// paying respects to the rate limit.
-    pub async fn get_all_org_repos(&self, org: &str) -> Result<Vec<Repo>, Box<dyn Error>> {
+
+    pub async fn list_all_repos(
+        &self,
+        user_type: GitHubUserType,
+        org: &str,
+    ) -> Result<Vec<Repo>, Box<dyn Error>> {
         let mut all_repos: Vec<Repo> = Vec::new();
         let mut page_number: u32 = 1;
 
         loop {
-            let r_body = self.get_org_repos(&org, Some(page_number)).await?;
-
-            if r_body.is_empty() {
-                break;
-            }
-
-            for repo in r_body {
-                all_repos.push(repo);
-            }
-
-            page_number += 1;
-        }
-
-        Ok(all_repos)
-    }
-
-    pub async fn get_all_user_repos(&self, user: &str) -> Result<Vec<Repo>, Box<dyn Error>> {
-        let mut all_repos: Vec<Repo> = Vec::new();
-        let mut page_number: u32 = 1;
-
-        loop {
-            let r_body: Vec<Repo> = self.get_user_repos(&user, Some(page_number)).await?;
+            let r_body = match user_type {
+                GitHubUserType::User => {
+                    self.list_repos(GitHubUserType::User, &org, Some(page_number))
+                        .await?
+                }
+                GitHubUserType::Organisation => {
+                    self.list_repos(GitHubUserType::Organisation, &org, Some(page_number))
+                        .await?
+                }
+            };
 
             if r_body.is_empty() {
                 break;
