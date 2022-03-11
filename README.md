@@ -8,6 +8,17 @@ A CLI tool to clone all visible GitHub repositories for a given user or organisa
 2. Optional: Create a GitHub Personal Access Token (PAT) that has access to the organisation or user you want to access. Without this, `reapclone` will only be able to see their public repositories.
 3. Optional: Export the PAT into you environment ` export GITHUB_TOKEN=<PAT>`. You should include the space in front of the export so the token doesn't end up in you shell's history.
 
+## Installation
+
+### MacOS
+
+Install on MacOS via homebrew.
+
+```
+brew tap tacentio/reapclone
+brew install reapclone
+```
+
 ## Usage
 
 ```
@@ -50,3 +61,4 @@ Any Pull Requests are welcome.
 - Add better error handling.
   - So far `reapclone`'s error handling isn't great (I think?). I'm not sure. But I'm interested to see your thoughts and PRs.
 - Add documentation for `crates.io`. Is this necessary for a binary crate?
+- Figure out a way to distribute easily to various platforms (Homebrew, apt, AUR, etc).
