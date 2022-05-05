@@ -12,6 +12,12 @@ pub struct CommandLineArgs {
     /// Organisation you want to clone.
     #[clap(short, long)]
     pub organisation: Option<String>,
+    /// Host to use. Default is github.com.
+    #[clap(long)]
+    pub host: Option<String>,
+    /// Host is GitHub enterprise
+    #[clap(short, long)]
+    pub enterprise: bool,
     /// Optional: GitHub Personal Access Token (PAT) to use to interact with
     /// the GitHub API. The tool works without this, however, it will only be able
     /// to find public repos for the user/organisation.
