@@ -3,6 +3,7 @@ use crate::client::github::GithubClient;
 use crate::config::CommandLineArgs;
 use futures::future;
 use std::error::Error;
+use std::process;
 use tokio::task;
 
 mod client;
@@ -18,34 +19,39 @@ pub async fn run(cli_args: CommandLineArgs) -> Result<(), Box<dyn Error>> {
     // the standard library (for example, IO errors).
     cli_args.validate()?;
     let gh_client = GithubClient::new(cli_args.github_token.as_deref(), APP_USER_AGENT)?;
+    let org = match &cli_args.user {
+        Some(user) => user.to_owned(),
+        None => match &cli_args.organisation {
+            Some(org) => org.to_owned(),
+            None => {
+                process::exit(1);
+            }
+        },
+    };
+    let host = match cli_args.host {
+        Some(host) => host,
+        None => String::from("api.github.com"),
+    };
+    let base_path = match cli_args.enterprise {
+        true => String::from("/api/v3"),
+        false => String::from(""),
+    };
+    let base_url = format!("https://{host}{base_path}");
+    let org_type = match &cli_args.user {
+        Some(_user) => GitHubUserType::User,
+        None => GitHubUserType::Organisation,
+    };
 
-    if let Some(user) = cli_args.user {
-        let mut handles = Vec::new();
-        println!("Cloning from user {}", user);
-        let repos = gh_client
-            .list_all_repos(GitHubUserType::User, &user)
-            .await?;
-        for repo in repos {
-            handles.push(task::spawn(
-                async move { GithubClient::clone_repo(&repo).await },
-            ));
-        }
-        future::join_all(handles).await;
-    } else if let Some(org) = cli_args.organisation {
-        let mut handles = Vec::new();
-        println!("Cloning from org {}", org);
-        let repos = gh_client
-            .list_all_repos(GitHubUserType::Organisation, &org)
-            .await?;
+    let mut handles = Vec::new();
+    let repos = gh_client.list_all_repos(org_type, &org, &base_url).await?;
 
-        for repo in repos {
-            handles.push(task::spawn(
-                async move { GithubClient::clone_repo(&repo).await },
-            ));
-        }
-
-        future::join_all(handles).await;
+    for repo in repos {
+        handles.push(task::spawn(
+            async move { GithubClient::clone_repo(&repo).await },
+        ));
     }
+
+    future::join_all(handles).await;
 
     Ok(())
 }

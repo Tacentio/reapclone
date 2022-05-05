@@ -14,7 +14,7 @@ pub struct GithubClient {
     http_client: reqwest::Client,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum GitHubUserType {
     User,
     Organisation,
@@ -51,11 +51,12 @@ impl GithubClient {
         user_type: GitHubUserType,
         org: &str,
         page: Option<u32>,
+        host: &str,
     ) -> Result<Vec<Repo>, Box<dyn Error>> {
         let page_number = page.unwrap_or(1);
         let url_base = match user_type {
-            GitHubUserType::Organisation => format!("https://api.github.com/orgs/{}/repos", org),
-            GitHubUserType::User => format!("https://api.github.com/users/{}/repos", org),
+            GitHubUserType::Organisation => format!("{host}/orgs/{}/repos", org),
+            GitHubUserType::User => format!("{host}/users/{}/repos", org),
         };
         let query_string = vec![("page", format!("{}", page_number))];
         let url = Url::parse_with_params(&url_base, query_string)?;
@@ -73,21 +74,14 @@ impl GithubClient {
         &self,
         user_type: GitHubUserType,
         org: &str,
+        host: &str,
     ) -> Result<Vec<Repo>, Box<dyn Error>> {
         let mut all_repos: Vec<Repo> = Vec::new();
         let mut page_number: u32 = 1;
+        println!("{:?}, {}, {}", user_type, org, host);
 
         loop {
-            let r_body = match user_type {
-                GitHubUserType::User => {
-                    self.list_repos(GitHubUserType::User, &org, Some(page_number))
-                        .await?
-                }
-                GitHubUserType::Organisation => {
-                    self.list_repos(GitHubUserType::Organisation, &org, Some(page_number))
-                        .await?
-                }
-            };
+            let r_body = self.list_repos(user_type.to_owned(), &org, Some(page_number), host).await?;
 
             if r_body.is_empty() {
                 break;
