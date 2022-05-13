@@ -1,6 +1,7 @@
 use clap::Parser;
-use std::error;
-use std::fmt;
+
+use crate::client::github::GitHubUserType;
+use crate::config_error::{ValidationError, ValidationErrorKind};
 
 /// Program to download all GitHub repositories of an organisation/user.
 #[derive(Parser, Debug)]
@@ -15,9 +16,6 @@ pub struct CommandLineArgs {
     /// Host to use. Default is github.com.
     #[clap(long)]
     pub host: Option<String>,
-    /// Host is GitHub enterprise
-    #[clap(short, long)]
-    pub enterprise: bool,
     /// Optional: GitHub Personal Access Token (PAT) to use to interact with
     /// the GitHub API. The tool works without this, however, it will only be able
     /// to find public repos for the user/organisation.
@@ -25,35 +23,32 @@ pub struct CommandLineArgs {
     pub github_token: Option<String>,
 }
 
-#[derive(Debug)]
-pub enum ValidationError {
-    BothOrgAndUserNotSet,
-    BothOrgAndUserSet,
+pub struct ParsedConfig {
+    pub org: String,
+    pub org_type: GitHubUserType,
 }
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "error validationg cli args")
-    }
-}
-
-impl error::Error for ValidationError {}
 
 impl CommandLineArgs {
-    // The application expects either organisation OR user to be set.
-    // Not both.
-    // This can likely be done in a better way, this is just the best way
-    // I currently know...
-    pub fn validate(&self) -> Result<(), ValidationError> {
+    pub fn validate(&self) -> Result<ParsedConfig, ValidationError> {
         if let Some(_user) = &self.user {
             if let Some(_org) = &self.organisation {
-                return Err(ValidationError::BothOrgAndUserSet);
+                return Err(ValidationError::new(ValidationErrorKind::BothOrgAndUserSet));
             }
-            return Ok(());
+            let parsed_config = ParsedConfig {
+                org: _user.to_owned(),
+                org_type: GitHubUserType::User,
+            };
+            return Ok(parsed_config);
         } else if let Some(_org) = &self.organisation {
-            return Ok(());
+            let parsed_config = ParsedConfig {
+                org: _org.to_owned(),
+                org_type: GitHubUserType::Organisation,
+            };
+            return Ok(parsed_config);
         }
 
-        Err(ValidationError::BothOrgAndUserNotSet)
+        Err(ValidationError::new(
+            ValidationErrorKind::BothOrgAndUserNotSet,
+        ))
     }
 }
