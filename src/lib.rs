@@ -6,20 +6,19 @@ use tokio::task;
 
 mod client;
 pub mod config;
-mod config_error;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 pub async fn run(cli_args: CommandLineArgs) -> Result<(), Box<dyn Error>> {
-    let parsed_config = cli_args.validate()?;
     let gh_client = GithubClient::new(
         cli_args.github_token.as_deref(),
         APP_USER_AGENT,
         cli_args.host.as_deref(),
     )?;
+    let org_type = gh_client.determine_org_type(&cli_args.organisation).await?;
     let mut handles = Vec::new();
     let repos = gh_client
-        .list_all_repos(parsed_config.org_type, &parsed_config.org)
+        .list_all_repos(org_type, &cli_args.organisation)
         .await?;
 
     for repo in repos {
