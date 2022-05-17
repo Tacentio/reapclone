@@ -67,6 +67,18 @@ impl GithubClient {
         }
     }
 
+    pub async fn determine_org_type(&self, org: &str) -> Result<GitHubUserType, Box<dyn Error>> {
+        if let Ok(_response) = self
+            .list_repos(GitHubUserType::Organisation, org, Some(1))
+            .await
+        {
+            return Ok(GitHubUserType::Organisation);
+        } else if let Ok(_response) = self.list_repos(GitHubUserType::User, org, Some(1)).await {
+            return Ok(GitHubUserType::User);
+        }
+        Err(Box::new(GitHubError::new(GitHubErrorKind::NotFound)))
+    }
+
     /// List GitHub repos for a user or organisation.
     pub async fn list_repos(
         &self,
