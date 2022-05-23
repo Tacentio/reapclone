@@ -22,23 +22,24 @@ brew install reapclone
 ## Usage
 
 ```
-reapclone 0.1.0
+reapclone 0.2.3
 Program to download all GitHub repositories of an organisation/user
 
 USAGE:
-    reapclone [OPTIONS] [GITHUB_TOKEN]
+    reapclone [OPTIONS] <ORGANISATION> [GITHUB_TOKEN]
 
 ARGS:
+    <ORGANISATION>    Organisation you want to clone
     <GITHUB_TOKEN>    Optional: GitHub Personal Access Token (PAT) to use to interact with the
                       GitHub API. The tool works without this, however, it will only be able to
-                      find public repos for the user/organisation [env:
-                      GITHUB_TOKEN=<PAT>
+                      find public repos for the user/organisation [env: GITHUB_TOKEN=]
 
 OPTIONS:
-    -h, --help                           Print help information
-    -o, --organisation <ORGANISATION>    Organisation you want to clone
-    -u, --user <USER>                    User you want to clone
-    -V, --version                        Print version information
+    -h, --help           Print help information
+        --host <HOST>    Host to use. Default is github.com
+        --list           Don't clone, just list found repositories
+        --port <PORT>    Port to use. Default is 443
+    -V, --version        Print version information
 ```
 
 ## Examples
