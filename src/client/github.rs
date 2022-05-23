@@ -29,6 +29,7 @@ impl GithubClient {
         auth_token: Option<&str>,
         user_agent: &str,
         host: Option<&str>,
+        port: Option<&str>,
     ) -> Result<GithubClient, Box<dyn Error>> {
         let t_host = match host {
             Some(h) => h.to_owned(),
@@ -40,7 +41,12 @@ impl GithubClient {
             None => String::from(""),
         };
 
-        let t_base_url = format!("https://{t_host}{t_base_path}");
+        let t_port = match port {
+            Some(p) => format!(":{}", p.to_owned()),
+            None => String::from(""),
+        };
+
+        let t_base_url = format!("https://{t_host}{t_port}{t_base_path}");
 
         match auth_token {
             Some(t) => {
