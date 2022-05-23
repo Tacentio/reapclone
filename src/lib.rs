@@ -14,17 +14,27 @@ pub async fn run(cli_args: CommandLineArgs) -> Result<(), Box<dyn Error>> {
         cli_args.github_token.as_deref(),
         APP_USER_AGENT,
         cli_args.host.as_deref(),
+        cli_args.port.as_deref(),
     )?;
     let org_type = gh_client.determine_org_type(&cli_args.organisation).await?;
     let mut handles = Vec::new();
+
+    println!("Searching for repositories...");
+
     let repos = gh_client
         .list_all_repos(org_type, &cli_args.organisation)
         .await?;
 
-    for repo in repos {
-        handles.push(task::spawn(
-            async move { GithubClient::clone_repo(&repo).await },
-        ));
+    if cli_args.list {
+        for repo in repos {
+            println!("{}", &repo.ssh_url);
+        }
+    } else {
+        for repo in repos {
+            handles.push(task::spawn(
+                async move { GithubClient::clone_repo(&repo).await },
+            ));
+        }
     }
 
     future::join_all(handles).await;
