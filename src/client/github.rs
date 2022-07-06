@@ -1,20 +1,30 @@
 use reqwest::header;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use std::error::Error;
 use std::process::Stdio;
 use tokio::process::Command;
 use url::Url;
 
 use crate::client::github_error::{GitHubError, GitHubErrorKind};
+use crate::client::url::build_url;
+use crate::client::models::Repo;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Repo {
-    pub ssh_url: String,
+pub enum ApiEndpoints {
+    ListCommits,
+    ListRepos,
 }
+
+pub struct PathParams {
+    pub base_url: String,
+    pub owner: Option<String>,
+    pub repo: Option<String>,
+    pub user_type: Option<GitHubUserType>,
+}
+
 
 pub struct GithubClient {
     http_client: reqwest::Client,
-    base_url: String,
+    pub base_url: String,
 }
 
 #[derive(Clone, Debug)]
@@ -75,74 +85,106 @@ impl GithubClient {
 
     pub async fn determine_org_type(&self, org: &str) -> Result<GitHubUserType, Box<dyn Error>> {
         if let Ok(_response) = self
-            .list_repos(GitHubUserType::Organisation, org, Some(1))
+            .generic_list_api::<Repo>(
+                &ApiEndpoints::ListRepos,
+                &PathParams {
+                    base_url: self.base_url.to_owned(),
+                    owner: Some(org.to_owned()),
+                    repo: None,
+                    user_type: Some(GitHubUserType::Organisation),
+                },
+                None,
+                None,
+            )
             .await
         {
             return Ok(GitHubUserType::Organisation);
-        } else if let Ok(_response) = self.list_repos(GitHubUserType::User, org, Some(1)).await {
+        } else if let Ok(_response) = self
+            .generic_list_api::<Repo>(
+                &ApiEndpoints::ListRepos,
+                &PathParams {
+                    base_url: self.base_url.to_owned(),
+                    owner: Some(org.to_owned()),
+                    repo: None,
+                    user_type: Some(GitHubUserType::User),
+                },
+                None,
+                None,
+            )
+            .await
+        {
             return Ok(GitHubUserType::User);
         }
+
         Err(Box::new(GitHubError::new(GitHubErrorKind::NotFound)))
     }
 
-    /// List GitHub repos for a user or organisation.
-    pub async fn list_repos(
+    pub async fn generic_list_api<T>(
         &self,
-        user_type: GitHubUserType,
-        org: &str,
+        api_endpoint: &ApiEndpoints,
+        params: &PathParams,
         page: Option<u32>,
-    ) -> Result<Vec<Repo>, Box<dyn Error>> {
+        per_page: Option<u32>,
+    ) -> Result<Vec<T>, Box<dyn Error>>
+    where
+        T: 'static + DeserializeOwned,
+    {
         let page_number = page.unwrap_or(1);
-        let url_base = match user_type {
-            GitHubUserType::Organisation => format!("{}/orgs/{}/repos", &self.base_url, org),
-            GitHubUserType::User => format!("{}/users/{}/repos", &self.base_url, org),
-        };
-        let query_string = vec![("page", format!("{}", page_number))];
-        let url = Url::parse_with_params(&url_base, query_string)?;
-        let response = self.http_client.get(url).send().await?;
-
-        if response.status().as_u16() == 404 {
+        let per_page = per_page.unwrap_or(30);
+        let query_string = vec![
+            ("page", format!("{}", page_number)),
+            ("per_page", format!("{}", per_page)),
+        ];
+        if let Ok(url_base) = build_url(api_endpoint, params) {
+            let url = Url::parse_with_params(&url_base, query_string)?;
+            let response = self.http_client.get(url).send().await?;
+            let response_body = response.json::<Vec<T>>().await?;
+            return Ok(response_body);
+        } else {
             return Err(Box::new(GitHubError::new(GitHubErrorKind::NotFound)));
         }
-
-        if response.status().as_u16() == 403 || response.status().as_u16() == 401 {
-            return Err(Box::new(GitHubError::new(GitHubErrorKind::Unauthorized)));
-        }
-
-        let r_body = response.json::<Vec<Repo>>().await?;
-        return Ok(r_body);
     }
 
-    pub async fn list_all_repos(
+    pub async fn generic_list_all_api<T>(
         &self,
-        user_type: GitHubUserType,
-        org: &str,
-    ) -> Result<Vec<Repo>, Box<dyn Error>> {
-        let mut all_repos: Vec<Repo> = Vec::new();
+        api_endpoint: &ApiEndpoints,
+        params: &PathParams,
+        max_pages: Option<u32>
+    ) -> Result<Vec<T>, Box<dyn Error>>
+    where
+        T: 'static + DeserializeOwned,
+    {
+        let mut all_items: Vec<T> = Vec::new();
         let mut page_number: u32 = 1;
+        let max_page_number = max_pages.unwrap_or(65535);
 
         loop {
-            let r_body = self
-                .list_repos(user_type.to_owned(), &org, Some(page_number))
+            if page_number >= max_page_number {
+                break;
+            }
+            let response_body = self
+                .generic_list_api::<T>(api_endpoint, params, Some(page_number), None)
                 .await?;
 
-            if r_body.is_empty() {
+            if response_body.is_empty() {
                 break;
             }
 
-            for repo in r_body {
-                all_repos.push(repo);
+            for item in response_body {
+                all_items.push(item);
             }
+
             page_number += 1;
         }
 
-        Ok(all_repos)
+        Ok(all_items)
     }
 
     /// Clones a GitHub repository, using it's SSH URL by spawning
     /// a child process.
-    pub async fn clone_repo(repo: &Repo) {
+    pub async fn clone_repo(repo: &Repo, directory: String) {
         let mut child = Command::new("git")
+            .current_dir(directory)
             .arg("clone")
             .arg(repo.ssh_url.to_owned())
             .stdout(Stdio::null())
