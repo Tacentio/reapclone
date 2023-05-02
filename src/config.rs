@@ -31,7 +31,17 @@ pub enum SubCommands {
         /// The maximum number of pages to analyse. Can help make user
         /// enumeration quicker for large organisations.
         #[clap(short, value_parser)]
-        max_pages: Option<u32>
+        max_pages: Option<u32>,
     },
-    ListRepos
+    ListRepos,
+    Repo {
+        repo: String,
+        #[clap(subcommand)]
+        commands: RepoSubcommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum RepoSubcommands {
+    Branches,
 }
