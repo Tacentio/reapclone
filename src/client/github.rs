@@ -6,12 +6,13 @@ use tokio::process::Command;
 use url::Url;
 
 use crate::client::github_error::{GitHubError, GitHubErrorKind};
-use crate::client::url::build_url;
 use crate::client::models::Repo;
+use crate::client::url::build_url;
 
 pub enum ApiEndpoints {
     ListCommits,
     ListRepos,
+    ListBranches,
 }
 
 pub struct PathParams {
@@ -21,6 +22,52 @@ pub struct PathParams {
     pub user_type: Option<GitHubUserType>,
 }
 
+pub struct PathParamsBuilder {
+    pub base_url: String,
+    pub owner: Option<String>,
+    pub repo: Option<String>,
+    pub user_type: Option<GitHubUserType>,
+}
+
+impl PathParamsBuilder {
+    pub fn new() -> PathParamsBuilder {
+        PathParamsBuilder {
+            base_url: String::from(""),
+            owner: None,
+            repo: None,
+            user_type: None,
+        }
+    }
+
+    pub fn base_url(mut self, base_url: &str) -> PathParamsBuilder {
+        self.base_url = base_url.to_owned();
+        self
+    }
+
+    pub fn owner(mut self, owner: &str) -> PathParamsBuilder {
+        self.owner = Some(owner.to_owned());
+        self
+    }
+
+    pub fn repo(mut self, repo: &str) -> PathParamsBuilder {
+        self.repo = Some(repo.to_owned());
+        self
+    }
+
+    pub fn user_type(mut self, user_type: GitHubUserType) -> PathParamsBuilder {
+        self.user_type = Some(user_type);
+        self
+    }
+
+    pub fn build(self) -> PathParams {
+        PathParams {
+            base_url: self.base_url,
+            owner: self.owner,
+            repo: self.repo,
+            user_type: self.user_type,
+        }
+    }
+}
 
 pub struct GithubClient {
     http_client: reqwest::Client,
@@ -149,7 +196,7 @@ impl GithubClient {
         &self,
         api_endpoint: &ApiEndpoints,
         params: &PathParams,
-        max_pages: Option<u32>
+        max_pages: Option<u32>,
     ) -> Result<Vec<T>, Box<dyn Error>>
     where
         T: 'static + DeserializeOwned,

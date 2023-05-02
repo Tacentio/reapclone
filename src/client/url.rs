@@ -1,4 +1,4 @@
-use crate::client::github::{ApiEndpoints, PathParams, GitHubUserType};
+use crate::client::github::{ApiEndpoints, GitHubUserType, PathParams};
 
 pub fn build_url(endpoint: &ApiEndpoints, params: &PathParams) -> Result<String, ()> {
     use ApiEndpoints::*;
@@ -36,6 +36,22 @@ pub fn build_url(endpoint: &ApiEndpoints, params: &PathParams) -> Result<String,
                 return Err(());
             }
         }
+
+        ListBranches => {
+            let owner = match &params.owner {
+                Some(o) => o,
+                None => return Err(()),
+            };
+
+            let repo = match &params.repo {
+                Some(r) => r,
+                None => return Err(()),
+            };
+
+            return Ok(format!(
+                "{}/repos/{}/{}/branches",
+                &params.base_url, &owner, &repo
+            ));
+        }
     }
 }
-
