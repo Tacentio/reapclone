@@ -159,6 +159,9 @@ pub async fn clone(cli_args: &CommandLineArgs) -> Result<(), Box<dyn Error>> {
         .await?;
 
     for repo in repos {
+        if cli_args.ignore_archived && repo.archived {
+            continue;
+        }
         let dir = output_dir.to_owned();
         let permit = sem.clone().acquire_owned().await.unwrap();
         handles.push(task::spawn(async move {

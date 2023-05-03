@@ -15,6 +15,9 @@ pub struct CommandLineArgs {
     /// Directory to clone repos in to.
     #[clap(short, long)]
     pub output_directory: Option<String>,
+    /// Ignore archived repositories
+    #[clap(short, long)]
+    pub ignore_archived: bool,
     /// Optional: GitHub Personal Access Token (PAT) to use to interact with
     /// the GitHub API. The tool works without this, however, it will only be able
     /// to find public repos for the user/organisation.

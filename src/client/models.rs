@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct Repo {
     pub ssh_url: String,
     pub name: String,
+    pub archived: bool,
 }
 
 #[derive(Serialize, Deserialize)]
